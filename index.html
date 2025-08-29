@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1"/>
+<title>Santech Business Solution — Timesheet</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0b3b6b">
+<link rel="icon" href="icons/icon-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+:root{ --brand:#0b3b6b; --accent:#02a0fc; --bg:#f3f6fb; }
+html,body{ margin:0; padding:0; background:var(--bg); color:#0f172a; -webkit-tap-highlight-color:transparent }
+.card{ background:white; border:1px solid #e5e7eb; border-radius:16px; box-shadow:0 1px 3px rgba(0,0,0,.04) }
+.input{ border:1px solid #cbd5e1; border-radius:12px; padding:10px 12px }
+.btn{ border-radius:12px; padding:10px 14px; font-weight:600 }
+.btn-primary{ background:var(--brand); color:white }
+.btn-outline{ border:1px solid var(--brand); color:var(--brand) }
+.link{ color:var(--accent); text-decoration:underline; }
+.badge{ font-size:12px; padding:2px 8px; border-radius:999px; background:#e6f3ff; color:#0a5ea8 }
+header.app{ position:sticky; top:0; z-index:10; background:rgba(255,255,255,0.85); backdrop-filter: blur(6px) }
+table{ width:100%; border-collapse:collapse }
+th,td{ padding:6px }
+thead th{ font-size:12px; color:#475569 }
+@media (max-width:720px){ .grid-2{ grid-template-columns:1fr!important } }
+/* Desktop shows table; Mobile shows cards */
+#tableWrap{ display:block }
+#mobileWrap{ display:none }
+@media (max-width:720px){
+  #tableWrap{ display:none }
+  #mobileWrap{ display:block }
+}
+.mobile-card{ border:1px solid #e5e7eb; border-radius:12px; padding:10px; margin-top:8px; background:white }
+.mobile-row{ display:grid; grid-template-columns:1fr 1fr; gap:8px }
+.mobile-row label{ font-size:12px }
+.mobile-row input{ padding:8px; border:1px solid #cbd5e1; border-radius:10px }
+</style>
+</head>
+<body>
+<div class="max-w-3xl mx-auto p-3 pb-28">
+  <header class="app flex items-center gap-3 py-2">
+    <img src="icons/logo.png" class="w-8 h-8 rounded-md" alt="logo"/>
+    <div>
+      <div class="text-xl font-bold leading-tight" style="color:var(--brand)">Santech Business Solution — Timesheet</div>
+      <div class="text-xs text-slate-500">PWA • Offline • SMS or Email approval flow</div>
+    </div>
+    <a class="ml-auto text-sm link" href="#" id="installBtn" style="display:none">Install App</a>
+  </header>
+
+  <section class="mt-3 card p-3">
+    <div class="flex gap-2 items-center">
+      <span class="badge">Mode</span>
+      <button id="modeEmployee" class="btn btn-primary">Employee</button>
+      <button id="modeManager" class="btn btn-outline">Manager</button>
+      <span class="ml-auto text-xs text-slate-500">Status: <span id="statusText">Ready</span></span>
+    </div>
+  </section>
+
+  <!-- EMPLOYEE -->
+  <section id="employeeView" class="mt-3 card p-3">
+    <h2 class="font-semibold text-lg" style="color:var(--brand)">Fill Timesheet (Employee)</h2>
+    <p class="text-sm text-slate-600">On Submit, a text message opens to your manager automatically. Email submit remains available as a separate button.</p>
+
+    <div class="grid grid-cols-2 gap-3 grid-2 mt-2">
+      <label class="text-sm">Employee Name<input id="empName" class="input" placeholder="Your name"/></label>
+      <label class="text-sm">Employee Email<input id="empEmail" class="input" placeholder="you@santech.com"/></label>
+      <label class="text-sm">Manager Email<input id="mgrEmail" class="input" placeholder="manager@santech.com"/></label>
+      <label class="text-sm">Manager Phone (SMS)<input id="mgrPhone" class="input" placeholder="+1 555 123 4567"/></label>
+      <label class="text-sm">Week Ending<input id="weekEnding" type="date" class="input"/></label>
+      <label class="text-sm">Rate/hr<input id="rate" type="number" step="0.01" class="input" placeholder="e.g., 20.00"/></label>
+    </div>
+
+    <!-- Desktop/Wide: table -->
+    <div id="tableWrap" class="mt-3 overflow-x-auto">
+      <table class="text-sm">
+        <thead>
+          <tr>
+            <th>Day</th><th>Date</th><th>Time In</th><th>Lunch (fixed)</th><th>Time Out</th><th>Per Diem (fixed)</th><th>Total (hrs)</th><th>Sign</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+        <tfoot>
+          <tr><td colspan="6" class="text-right font-semibold">Total Hours</td><td id="totalHours"></td><td></td></tr>
+        </tfoot>
+      </table>
+    </div>
+
+    <!-- Mobile/Narrow: cards (no horizontal scroll) -->
+    <div id="mobileWrap" class="mt-2">
+      <div id="rowsMobile"></div>
+      <div class="mt-2 text-right text-sm">Total Hours: <span id="totalHoursMobile">0.00</span></div>
+    </div>
+
+    <div class="mt-3 grid grid-cols-2 gap-3 grid-2">
+      <label class="text-sm">Employee (type name)<input id="sigEmp" class="input" placeholder="Signature text"/></label>
+      <label class="text-sm">Employee Date<input id="sigEmpDate" type="date" class="input"/></label>
+      <label class="text-sm">Approval (manager name)<input id="sigMgr" class="input" placeholder="Name"/></label>
+      <label class="text-sm">Approval Date<input id="sigMgrDate" type="date" class="input"/></label>
+    </div>
+
+    <div class="mt-3 flex flex-wrap gap-2">
+      <button id="btnSaveLocal" class="btn btn-outline">Save (device)</button>
+      <button id="btnSubmitSMS" class="btn btn-primary">Submit (SMS to Manager)</button>
+      <button id="btnSubmitEmail" class="btn btn-outline">Submit (Email)</button>
+      <button id="btnCopyCode" class="btn btn-outline">Copy SMS Code</button>
+      <button id="btnClear" class="btn btn-outline">Clear</button>
+    </div>
+  </section>
+
+  <!-- MANAGER -->
+  <section id="managerView" class="mt-3 card p-3" style="display:none">
+    <h2 class="font-semibold text-lg" style="color:var(--brand)">Manager — Request / Import / Approve</h2>
+    <div class="grid grid-cols-2 gap-3 grid-2 mt-2">
+      <label class="text-sm">Manager Name<input id="m_name" class="input" placeholder="Your name"/></label>
+      <label class="text-sm">Manager Email<input id="m_email" class="input" placeholder="you@santech.com"/></label>
+      <label class="text-sm">Employee Name<input id="m_emp_name" class="input" placeholder="Employee"/></label>
+      <label class="text-sm">Employee Email<input id="m_emp_email" class="input" placeholder="employee@santech.com"/></label>
+      <label class="text-sm">Week Ending<input id="m_weekEnding" type="date" class="input"/></label>
+    </div>
+    <div class="mt-2 flex gap-2 flex-wrap">
+      <button id="btnSendRequest" class="btn btn-primary">Send Email Request</button>
+    </div>
+
+    <hr class="my-3">
+    <h3 class="font-medium">Import a submission from SMS code (offline)</h3>
+    <textarea id="m_sms_code" class="input" rows="3" placeholder="Paste code the employee texted you"></textarea>
+    <div class="mt-2 flex gap-2">
+      <button id="btnImportCode" class="btn btn-outline">Load from Code</button>
+      <button id="btnSubmitDecision" class="btn btn-primary">Approve/Reject (needs Internet)</button>
+    </div>
+
+    <p class="text-xs text-slate-600 mt-2">Then paste Approval Code (from email) if also submitted online:</p>
+    <div class="grid grid-cols-3 gap-3 grid-2 mt-2">
+      <label class="text-sm col-span-2">Approval Code<input id="m_code" class="input" placeholder="ABC123"/></label>
+      <label class="text-sm">Decision
+        <select id="m_decision" class="input">
+          <option value="APPROVED">APPROVED</option>
+          <option value="REJECTED">REJECTED</option>
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <footer class="h-10"></footer>
+</div>
+
+<script>
+let deferredPrompt=null;
+window.addEventListener('beforeinstallprompt',(e)=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').style.display='block';});
+document.getElementById('installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;}};
+
+const SCRIPT_URL = localStorage.getItem('SCRIPT_URL') || '';
+const setStatus = (t)=>document.getElementById('statusText').textContent=t;
+
+const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const tbody = document.getElementById('rows');
+const rowsMobile = document.getElementById('rowsMobile');
+
+function timeToMinutes(t){ if(!t) return null; const [h,m]=t.split(':').map(Number); return h*60+m; }
+function recalc(){
+  let total=0;
+  // desktop
+  tbody.querySelectorAll('tr').forEach(tr=>{
+    const a=timeToMinutes(tr.querySelector('.tin').value);
+    const b=timeToMinutes(tr.querySelector('.tout').value);
+    const lunch=30; // fixed
+    if(a!=null && b!=null && b>=a){
+      const mins=Math.max(0,(b-a)-lunch);
+      const hrs=(mins/60); total+=hrs;
+      tr.querySelector('.total').textContent=hrs.toFixed(2);
+    }else{ tr.querySelector('.total').textContent=''; }
+  });
+  // mobile
+  rowsMobile.querySelectorAll('.mcard').forEach(card=>{
+    const a=timeToMinutes(card.querySelector('.tin').value);
+    const b=timeToMinutes(card.querySelector('.tout').value);
+    const lunch=30;
+    if(a!=null && b!=null && b>=a){
+      const mins=Math.max(0,(b-a)-lunch);
+      const hrs=(mins/60);
+      total += hrs;
+      card.querySelector('.total').value=hrs.toFixed(2);
+    }else{ card.querySelector('.total').value=''; }
+  });
+  document.getElementById('totalHours').textContent=total.toFixed(2);
+  document.getElementById('totalHoursMobile').textContent=total.toFixed(2);
+}
+
+function buildRows(){
+  days.forEach((d,i)=>{
+    // desktop row
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="p-2">${d}</td>
+      <td class="p-1"><input type="date" class="input w-full date"></td>
+      <td class="p-1"><input type="time" class="input w-full tin"></td>
+      <td class="p-1"><input class="input w-full lunch" value="30 minutes" disabled></td>
+      <td class="p-1"><input type="time" class="input w-full tout"></td>
+      <td class="p-1"><input class="input w-full pd" value="$50" disabled></td>
+      <td class="p-2 total"></td>
+      <td class="p-1"><input class="input w-full sign" placeholder="Init"/></td>
+    `;
+    tbody.appendChild(tr);
+
+    // mobile card
+    const card = document.createElement('div');
+    card.className = 'mobile-card mcard';
+    card.innerHTML = `
+      <div class="text-sm font-semibold mb-1">${d}</div>
+      <div class="mobile-row">
+        <label>Date<input type="date" class="date"/></label>
+        <label>Time In<input type="time" class="tin"/></label>
+        <label>Lunch (fixed)<input value="30 minutes" disabled/></label>
+        <label>Time Out<input type="time" class="tout"/></label>
+        <label>Per Diem (fixed)<input value="$50" disabled/></label>
+        <label>Total (hrs)<input class="total" disabled/></label>
+        <label>Sign<input class="sign" placeholder="Init"/></label>
+      </div>
+    `;
+    rowsMobile.appendChild(card);
+  });
+  tbody.addEventListener('input', recalc);
+  rowsMobile.addEventListener('input', recalc);
+}
+
+function collectPayload(){
+  const useDesktop = window.matchMedia('(min-width: 721px)').matches;
+  const rows = [];
+  if(useDesktop){
+    tbody.querySelectorAll('tr').forEach(tr=>{
+      rows.push({
+        date: tr.querySelector('.date').value,
+        tin: tr.querySelector('.tin').value,
+        lunch: 30,
+        tout: tr.querySelector('.tout').value,
+        pd: 50,
+        sign: tr.querySelector('.sign').value,
+      });
+    });
+  }else{
+    rowsMobile.querySelectorAll('.mcard').forEach(card=>{
+      rows.push({
+        date: card.querySelector('.date').value,
+        tin: card.querySelector('.tin').value,
+        lunch: 30,
+        tout: card.querySelector('.tout').value,
+        pd: 50,
+        sign: card.querySelector('.sign').value,
+      });
+    });
+  }
+  return {
+    empName: document.getElementById('empName').value,
+    empEmail: document.getElementById('empEmail').value,
+    mgrEmail: document.getElementById('mgrEmail').value,
+    mgrPhone: document.getElementById('mgrPhone').value,
+    weekEnding: document.getElementById('weekEnding').value,
+    rate: document.getElementById('rate').value,
+    sigEmp: document.getElementById('sigEmp').value,
+    sigEmpDate: document.getElementById('sigEmpDate').value,
+    sigMgr: document.getElementById('sigMgr').value,
+    sigMgrDate: document.getElementById('sigMgrDate').value,
+    rows
+  };
+}
+
+function saveLocal(){ localStorage.setItem('SBS.timesheet.smsfix', JSON.stringify(collectPayload())); alert('Saved on device'); }
+function loadLocal(){
+  const s=localStorage.getItem('SBS.timesheet.smsfix'); if(!s) return;
+  try{
+    const d=JSON.parse(s);
+    document.getElementById('empName').value=d.empName||'';
+    document.getElementById('empEmail').value=d.empEmail||'';
+    document.getElementById('mgrEmail').value=d.mgrEmail||'';
+    document.getElementById('mgrPhone').value=d.mgrPhone||'';
+    document.getElementById('weekEnding').value=d.weekEnding||'';
+    document.getElementById('rate').value=d.rate||'';
+    document.getElementById('sigEmp').value=d.sigEmp||'';
+    document.getElementById('sigEmpDate').value=d.sigEmpDate||'';
+    document.getElementById('sigMgr').value=d.sigMgr||'';
+    document.getElementById('sigMgrDate').value=d.sigMgrDate||'';
+    (d.rows||[]).forEach((r,i)=>{
+      const tr=tbody.querySelectorAll('tr')[i]; if(tr){
+        tr.querySelector('.date').value=r.date||'';
+        tr.querySelector('.tin').value=r.tin||'';
+        tr.querySelector('.tout').value=r.tout||'';
+        tr.querySelector('.sign').value=r.sign||'';
+      }
+      const card=rowsMobile.querySelectorAll('.mcard')[i]; if(card){
+        card.querySelector('.date').value=r.date||'';
+        card.querySelector('.tin').value=r.tin||'';
+        card.querySelector('.tout').value=r.tout||'';
+        card.querySelector('.sign').value=r.sign||'';
+      }
+    });
+  }catch(e){}
+}
+
+async function api(path, payload){
+  if(!SCRIPT_URL){ alert('Admin: set SCRIPT_URL (see README)'); return {ok:false}; }
+  setStatus('Contacting server...');
+  try{
+    const r = await fetch(SCRIPT_URL + '?path=' + encodeURIComponent(path), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(payload)
+    });
+    const data = await r.json();
+    setStatus('Ready');
+    return data;
+  }catch(e){
+    setStatus('Offline or server error');
+    alert('Error: ' + e.message);
+    return {ok:false, error:String(e)};
+  }
+}
+
+function payloadToSMSCode(obj){ try{ return btoa(unescape(encodeURIComponent(JSON.stringify(obj)))); } catch(e){ alert('Could not make code'); return ''; } }
+function codeToPayload(code){ try{ return JSON.parse(decodeURIComponent(escape(atob(code)))); } catch(e){ alert('Invalid code'); return null; } }
+
+document.getElementById('btnSubmitSMS').onclick = ()=>{
+  const p = collectPayload();
+  const code = payloadToSMSCode(p);
+  const mgrPhone = (p.mgrPhone||'').replace(/[^+0-9]/g,'');
+  const msg = `SANTECH TIMESHEET\nEMP: ${p.empName}\nWEEK: ${p.weekEnding}\nCODE: ${code}`;
+  const href = `sms:${mgrPhone}?&body=${encodeURIComponent(msg)}`;
+  location.href = href;
+};
+
+document.getElementById('btnSubmitEmail').onclick = async()=>{
+  const res = await api('/submit', collectPayload());
+  if(res.ok) alert('Submitted to manager (email).');
+  else alert('Submit failed');
+};
+
+document.getElementById('btnCopyCode').onclick = async()=>{
+  const code = payloadToSMSCode(collectPayload());
+  await navigator.clipboard.writeText(code);
+  alert('Copied SMS code.');
+};
+
+function switchMode(isMgr){
+  document.getElementById('employeeView').style.display = isMgr?'none':'block';
+  document.getElementById('managerView').style.display = isMgr?'block':'none';
+  document.getElementById('modeManager').className = 'btn ' + (isMgr?'btn-primary':'btn-outline');
+  document.getElementById('modeEmployee').className = 'btn ' + (!isMgr?'btn-primary':'btn-outline');
+}
+document.getElementById('modeEmployee').onclick=()=>switchMode(false);
+document.getElementById('modeManager').onclick=()=>switchMode(true);
+
+document.getElementById('btnSendRequest').onclick = async () => {
+  const payload = {
+    m_name: document.getElementById('m_name').value,
+    m_email: document.getElementById('m_email').value,
+    emp_name: document.getElementById('m_emp_name').value,
+    emp_email: document.getElementById('m_emp_email').value,
+    weekEnding: document.getElementById('m_weekEnding').value,
+    app_url: location.origin + location.pathname
+  };
+  const res = await api('/request', payload);
+  if(res.ok){ alert('Request emailed to employee.'); }
+  else{ alert('Request failed.'); }
+};
+
+document.getElementById('btnImportCode').onclick = ()=>{
+  const code = document.getElementById('m_sms_code').value.trim();
+  const p = codeToPayload(code);
+  if(!p) return;
+  alert('Loaded SMS submission for ' + (p.empName||''));
+};
+
+document.getElementById('btnSubmitDecision').onclick = async () => {
+  const payload = {
+    code: document.getElementById('m_code').value,
+    decision: document.getElementById('m_decision').value,
+    approver: document.getElementById('m_name').value
+  };
+  const res = await api('/approve', payload);
+  if(res.ok){ alert('Decision saved & employee notified.'); }
+  else{ alert('Approve failed'); }
+};
+
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('./service-worker.js'); }
+buildRows(); loadLocal(); recalc();
+
+const params = new URLSearchParams(location.search);
+if(params.get('emp')) document.getElementById('empName').value = params.get('emp');
+if(params.get('email')) document.getElementById('empEmail').value = params.get('email');
+if(params.get('mgr')) document.getElementById('mgrEmail').value = params.get('mgr');
+if(params.get('week')) document.getElementById('weekEnding').value = params.get('week');
+</script>
+</body>
+</html>

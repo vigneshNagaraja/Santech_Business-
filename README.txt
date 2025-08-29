@@ -1,0 +1,1 @@
+This build: Submit via SMS, fixed lunch=30 and per-diem=$50 (not editable), and mobile cards (no sideways scrolling). Upload to GitHub Pages.
