@@ -149,7 +149,7 @@ let deferredPrompt=null;
 window.addEventListener('beforeinstallprompt',(e)=>{e.preventDefault();deferredPrompt=e;document.getElementById('installBtn').style.display='block';});
 document.getElementById('installBtn').onclick=async()=>{if(deferredPrompt){deferredPrompt.prompt();deferredPrompt=null;}};
 
-const SCRIPT_URL = localStorage.getItem('SCRIPT_URL') || '';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyourRealID12345/exec';
 const setStatus = (t)=>document.getElementById('statusText').textContent=t;
 
 const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
